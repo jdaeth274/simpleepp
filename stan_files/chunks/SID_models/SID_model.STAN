@@ -2,16 +2,18 @@
 functions{
 
 matrix simpleepp_no_art(vector kappa, real iota, real mu, vector sigma,
-vector beta, vector mu_i, vector mu_d, real dt){
+vector delta, vector mu_i, real dt){
 //// So in this case we have @kappa as our R parameter, @iota as our initial @mu is our population death rate, @sigma is our progression rate through CD4 stages @mu_i is our death rate for each of the cd4 stages, the length of this also determines the number of stages and finally @dt is our time step, in Euler this is one tenth of the time step
-  vector[rows(kappa)+1] S;
-  matrix[rows(mu_i), rows(kappa)+1] I;
-  matrix[rows(sigma) + 1,rows(kappa)+1] D;
-  vector[rows(kappa)+1] rho;                                              
+  vector[rows(kappa) + 1] S;
+  matrix[rows(mu_i) - 1, rows(kappa)+1] I;
+  matrix[rows(mu_i), rows(kappa)+1] D;
+  vector[rows(kappa) + 1] rho;
+  vector[rows(kappa) + 1] diagns;
   // rho is our I/N so when multipled by kappa it becomes our force of infection
   vector[rows(kappa)+1] lambda;         // This is our force of infection
   int DS;
   DS = rows(mu_i);
+  
 
   // initial values
   S[1] = 1000000 * (1 - iota);
@@ -41,23 +43,29 @@ vector beta, vector mu_i, vector mu_d, real dt){
 
     lambda[t+1] = kappa[t] * rho[t];
 
-    deaths = mu * (S[t] + It + Dt) + sum(mu_i .* I[,t]) + sum(mu_d .* D[,t]);
+    deaths = mu * (S[t] + It + Dt) + sum(mu_i .* I[,t]) + sum(mu_i .* D[,t]);
     S[t+1] = S[t] + dt*(-lambda[t+1] * S[t] - mu * S[t] + deaths);                            // I think + deaths here is to 
                                                                                               // keep the pop size constant
 
-    I[1, t+1] = I[1, t] + dt*(lambda[t+1] * S[t] - (mu + mu_i[1] + sigma[1] + beta[1]) * I[1, t]);
+    I[1, t+1] = I[1, t] + dt*(lambda[t+1] * S[t] - (mu + mu_i[1] + sigma[1] + delta[1]) * I[1, t]);
     for(m in 2:(DS))
-      I[m, t+1] = I[m, t] + dt*(sigma[m-1] * I[m-1, t] - (mu + mu_i[m] + sigma[m]+ beta[m]) * I[m, t]);
+      I[m, t+1] = I[m, t] + dt*(sigma[m-1] * I[m-1, t] - (mu + mu_i[m] + sigma[m]+ delta[m]) * I[m, t]);
     
-    D[1, t+1] = D[1, t] + dt*(beta[1] * I[1, t] - (mu + mu_i))
+    D[1, t+1] = D[1, t] + dt*(delta[1] * I[1, t] - (mu + mu_i[1] + sigma[1]) * D[1, t]);
+    for (m in 2:DS)
+      D[m, t+1] = D[m, t] + dt*((delta[m] * I[m, t]) + (sigma[m-1] * D[m-1, t]) - (mu + mu_i[m] + sigma[m]) * D[m, t]);
     
+    D[DS + 1, t+1] = D[DS + 1, t] + dt*((sigma[4] * I[DS, t]) + (sigma[4] * D[4, t])  - (mu + mu_i[DS + 1]) * D[DS + 1, t]);
 
-    rho[t+1] = 1.0 - S[t+1] / (S[t+1] + sum(I[ ,t+1]) );
+    rho[t+1] = 1.0 - S[t+1] / (S[t+1] + sum(I[ ,t+1]) + sum(D[,t+1]));
+    
+    diagns[t] = Dt;
+    
   }
 
 
-  return(append_col(append_row(kappa[1], kappa),
-		    append_col(lambda, rho)));
+  return(append_col(append_col(append_row(kappa[1], kappa),
+		    append_col(lambda, rho)), diagns));
 }
 
 }
@@ -84,10 +92,12 @@ data {
 
  real mu;                                                               // This is our population level death rate
 
- vector[3] sigma;                                                       // This is our vector of transition rates
+ vector[4] sigma;                                                       // This is our vector of transition rates
 
- vector[4] mu_i;                                                        // This is our vector of death rates
+ vector[5] mu_i;                                                        // This is our vector of death rates
 
+ vector[4] delta; 
+ 
  real dt;                                                               // This is our time step
 
  real dt_2;                                                             // this is our second time step for generating the output from the fitted beta parameters
@@ -104,7 +114,7 @@ parameters{
 
  vector[cols(X_design)] beta;                                  // This is the knot point values
 
- real<lower = 0, upper =1> sigma_pen;                                    // This is the penalty to apply to the spline to make it smooth
+ real<lower = 0, upper =1> sigma_pen;                          // This is the penalty to apply to the spline to make it smooth
 
 
  }
@@ -114,7 +124,7 @@ transformed parameters{
 
  vector[size(rows_to_interpret)] y_hat;
 
- y_hat = simpleepp_no_art( exp(X_design * beta) , iota, mu, sigma, mu_i, dt_2)[rows_to_interpret, 3];
+ y_hat = simpleepp_no_art( exp(X_design * beta) , iota, mu, sigma, delta, mu_i, dt_2)[rows_to_interpret, 4];
 }
 
 
@@ -133,10 +143,10 @@ model {
 
 generated quantities{
 
-matrix[time_steps_euler , 3] fitted_output;
+matrix[time_steps_euler , 4] fitted_output;
 vector[rows(X_design)] fitted_kappa;
 
 fitted_kappa = exp(X_design * beta);
-fitted_output = simpleepp_no_art(fitted_kappa, iota, mu, sigma, mu_i, dt_2);       // This models the data after our fitting procedure
+fitted_output = simpleepp_no_art(fitted_kappa, iota, mu, sigma, delta, mu_i, dt_2);       // This models the data after our fitting procedure
 
 }
