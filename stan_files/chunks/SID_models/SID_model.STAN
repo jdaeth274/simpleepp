@@ -12,7 +12,7 @@ vector delta, vector mu_i, real dt){
   // rho is our I/N so when multipled by kappa it becomes our force of infection
   vector[rows(kappa)+1] lambda;         // This is our force of infection
   int DS;
-  DS = rows(mu_i);
+  DS = rows(sigma);
   
 
   // initial values
@@ -43,7 +43,7 @@ vector delta, vector mu_i, real dt){
 
     lambda[t+1] = kappa[t] * rho[t];
 
-    deaths = mu * (S[t] + It + Dt) + sum(mu_i .* I[,t]) + sum(mu_i .* D[,t]);
+    deaths = mu * (S[t] + It + Dt) + sum(mu_i[1:4] .* I[,t]) + sum(mu_i .* D[,t]);
     S[t+1] = S[t] + dt*(-lambda[t+1] * S[t] - mu * S[t] + deaths);                            // I think + deaths here is to 
                                                                                               // keep the pop size constant
 
