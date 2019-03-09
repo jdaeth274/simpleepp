@@ -8,7 +8,7 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
 
-expose_stan_functions("./simpleepp/stan_files/chunks/SID_models/SID_model.STAN")
+expose_stan_functions("./simpleepp/stan_files/chunks/SID_models/SID_model.stan")
 
 ###############################################################################
 ## Now lets run the simulated model from the STAN functions ###################
@@ -99,4 +99,71 @@ sim_plot<-function(sim_df){
 
 plotted_sim<-sim_plot(sim_model_output$sim_df)
 plot(plotted_sim$whole)
+
+###############################################################################
+## Now that we've run the model once we can look to try and take the output ###
+## of number of diagnoses and use these to fit our future models ##############
+###############################################################################
+
+year_range <- 1970:2015
+
+data_collector <- function(sim_res, year_range, xstart){
+  
+  start_val <- (year_range[1] - xstart)*10 + 1
+  end_val <- ((year_range[1] - xstart)*10) + ((length(year_range) - 1) * 10) + 1
+  
+  diagnoses_tot <- sim_res$diagnoses
+  
+  diag_to_keep <- seq(from  = start_val, to = end_val, by = 10)
+  
+  diag_to_keep <- round(diagnoses_tot[diag_to_keep])
+  
+  return(diag_to_keep)
+}
+
+diags_data <- data_collector(sim_model_output$sim_df, year_range, xstart)
+###############################################################################
+## Now we've got our data from the simulated model, we can also generate the ##
+## RW matrices for the input into the dataframe. ##############################
+###############################################################################
+
+xout<-seq(1970,2019.9,0.1)
+spline_matrix<-splineDesign(1969:2021,xout,ord = 2)            ## This matrix is the spline design one 
+penalty_matrix<-diff(diag(ncol(spline_matrix)), diff=2)        ## This matrix creates the differences between your kappa values 
+rows_to_evaluate<-0:45*10+1
+
+stan_data_discrete<-list(
+  n_obs = length(year_range),
+  y = as.array(diags_data),
+  time_steps_euler = 501,
+  penalty_order = 2,
+  estimate_period = 5,
+  time_steps_year = 51,
+  X_design = spline_matrix,
+  D_penalty = penalty_matrix,
+  mu = mu,
+  sigma = sigma,
+  mu_i = mu_i,
+  delta = delta,
+  dt = 1,
+  dt_2 = 0.1,
+  rows_to_interpret = as.array(rows_to_evaluate)
+)
+
+params_monitor_hiv<-c("y_hat","iota","fitted_output","beta","sigma_pen")  
+
+test_stan_hiv<- stan("~/Dropbox/jeff_hiv_work/simpleepp/stan_files/chunks/SID_models/SID_model.stan",
+                     data = stan_data_discrete,
+                     pars = params_monitor_hiv,
+                     chains = 1, iter = 10)  
+
+
+mod_hiv_prev <- stan("hiv_project/simpleepp/stan_files/chunks/cd4_matrix_random_walk.stan", data = stan_data_discrete,
+                     pars = params_monitor_hiv,chains = 3,warmup = 500,iter = 1500,
+                     control = list(adapt_delta = 0.99))
+
+  
+  
+  
+
 

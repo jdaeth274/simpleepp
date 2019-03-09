@@ -11,7 +11,7 @@ require(gridExtra)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
-expose_stan_functions("hiv_project/simpleepp/stan_files/chunks/cd4_matrix_random_walk.stan")
+expose_stan_functions("~/Dropbox/MRes/hiv_project/simpleepp/stan_files/chunks/cd4_matrix_random_walk.stan")
 require(grid)
 
 
@@ -182,7 +182,7 @@ stan_data_discrete<-list(
   
 params_monitor_hiv<-c("y_hat","iota","fitted_output","beta","sigma_pen")  
   
-test_stan_hiv<- stan("hiv_project/simpleepp/stan_files/chunks/cd4_matrix_random_walk.stan",
+test_stan_hiv<- stan("~/Dropbox/MRes/hiv_project/simpleepp/stan_files/chunks/cd4_matrix_random_walk.stan",
                                         data = stan_data_discrete,
                                         pars = params_monitor_hiv,
                                         chains = 1, iter = 10)  
