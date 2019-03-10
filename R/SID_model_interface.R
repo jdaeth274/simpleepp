@@ -2,6 +2,7 @@
 ## Running the simple SID HIV model from STAN #################################
 ###############################################################################
 require(reshape2)
+require(splines)
 require(ggplot2)
 require(rstan)
 rstan_options(auto_write = TRUE)
@@ -107,7 +108,7 @@ plot(plotted_sim$whole)
 
 year_range <- 1970:2015
 
-data_collector <- function(sim_res, year_range, xstart){
+data_collector <- function(sim_res, year_range, xstart, number_reps = 1){
   
   start_val <- (year_range[1] - xstart)*10 + 1
   end_val <- ((year_range[1] - xstart)*10) + ((length(year_range) - 1) * 10) + 1
@@ -118,10 +119,29 @@ data_collector <- function(sim_res, year_range, xstart){
   
   diag_to_keep <- round(diagnoses_tot[diag_to_keep])
   
-  return(diag_to_keep)
+  random_diags <- matrix(data = NA, nrow = number_reps,
+                         ncol = length(diag_to_keep))
+  
+  for (i in 1:number_reps)
+  random_diags[i,] <- rpois(length(diag_to_keep), diag_to_keep)
+  
+  return(random_diags)
 }
 
 diags_data <- data_collector(sim_model_output$sim_df, year_range, xstart)
+
+###############################################################################
+## Lets just create a large random datasets of the diagnoses to fit our #######
+## cluster run models with ####################################################
+###############################################################################
+
+diags_data_to_be_saved <- data_collector(sim_model_output$sim_df,
+                                         year_range, xstart,
+                                         number_reps = 100)
+
+write.table(diags_data_to_be_saved, file = "./simpleepp/analysis/SID_models_diag_10_3_2019.tsv",
+            row.names = FA)
+
 ###############################################################################
 ## Now we've got our data from the simulated model, we can also generate the ##
 ## RW matrices for the input into the dataframe. ##############################
@@ -158,11 +178,114 @@ test_stan_hiv<- stan("~/Dropbox/jeff_hiv_work/simpleepp/stan_files/chunks/SID_mo
                      chains = 1, iter = 10)  
 
 
-mod_hiv_prev <- stan("hiv_project/simpleepp/stan_files/chunks/cd4_matrix_random_walk.stan", data = stan_data_discrete,
+mod_hiv_prev <- stan("~/Dropbox/jeff_hiv_work/simpleepp/stan_files/chunks/SID_models/SID_model.stan",
+                     data = stan_data_discrete,
                      pars = params_monitor_hiv,chains = 3,warmup = 500,iter = 1500,
                      control = list(adapt_delta = 0.99))
 
+
+plot_stan_model_fit<-function(model_output,sim_output,plot_name,xout){
   
+  posts_hiv <- rstan::extract(model_output)
+  
+  
+  iota_dist<-posts_hiv$iota
+  params<-median(posts_hiv$iota)
+  params_low<-quantile(posts_hiv$iota,c(0.025))
+  params_high<-quantile(posts_hiv$iota,c(0.975))
+  
+  params_df<-rbind.data.frame(params_low,params,params_high)
+  names(params_df)<-c("iota")
+  
+  sigma_pen_dist<-posts_hiv$sigma_pen
+  sigma_values<-median(posts_hiv$sigma_pen)
+  sigma_low<-quantile(posts_hiv$sigma_pen,c(0.025))
+  sigma_high<-quantile(posts_hiv$sigma_pen,probs=c(0.975))
+  sigma_df<-rbind.data.frame(sigma_low,sigma_values,sigma_high)
+  names(sigma_df)<-c("sigma_pen")
+  
+  
+  
+  # These should match well. 
+  
+  #################
+  # Plot model fit:
+  
+  # Proportion infected from the synthetic data:
+  
+  #sample_prop = sample_y / sample_n
+  
+  # Model predictions across the sampling time period.
+  # These were generated with the "fake" data and time series.
+  #mod_median = apply(posts_hiv$fake_I[,,2], 2, median)
+  #mod_low = apply(posts_hiv$fake_I[,,2], 2, quantile, probs=c(0.025))
+  #mod_high = apply(posts_hiv$fake_I[,,2], 2, quantile, probs=c(0.975))
+  mod_time = xout
+  
+  
+  
+  prev_median<-(apply(posts_hiv$fitted_output[,,3],2,median))*100
+  prev_low<-(apply(posts_hiv$fitted_output[,,3],2,quantile,probs=c(0.025)))*100
+  prev_high<-(apply(posts_hiv$fitted_output[,,3],2,quantile,probs=c(0.975)))*100
+  
+  
+  incidence_median<-apply(posts_hiv$fitted_output[,,2],2,median)
+  incidence_low<-apply(posts_hiv$fitted_output[,,2],2,quantile,probs=c(0.025))
+  incidence_high<-apply(posts_hiv$fitted_output[,,2],2,quantile,probs=c(0.975))
+  
+  r_median<-apply(posts_hiv$fitted_output[,,1],2,median)
+  r_low<-apply(posts_hiv$fitted_output[,,1],2,quantile,probs=c(0.025))
+  r_high<-apply(posts_hiv$fitted_output[,,1],2,quantile,probs=c(0.975))
+  
+  # Combine into two data frames for plotting
+  #df_sample = data.frame(sample_prop, sample_time)
+  df_fit_prevalence = data.frame(prev_median, prev_low, prev_high, xout )
+  names(df_fit_prevalence)<-c("median","low","high","time")
+  df_fit_prevalence$credible_skew<-(df_fit_prevalence$high - df_fit_prevalence$median) - (df_fit_prevalence$median - df_fit_prevalence$low)
+  
+  df_fit_incidence<-data.frame(incidence_low,incidence_median,incidence_high,xout)
+  names(df_fit_incidence)<-c("low","median","high","time")
+  
+  r_fit<-data.frame(r_low,r_median,r_high,xout)
+  names(r_fit)<-c("low","median","high","time")
+  # Plot the synthetic data with the model predictions
+  # Median and 95% Credible Interval
+  
+  
+  plotter<- ggplot(data = df_fit_prevalence) + 
+    geom_line(data = df_fit_prevalence, aes(x=time,y=median),colour="midnightblue",size=1)+
+    geom_ribbon(data = df_fit_prevalence,aes(x=time,ymin=low,ymax=high),
+                colour="midnightblue",alpha=0.2,fill="midnightblue")+
+    geom_line(data = sim_output,aes(x=time,y=prev_percent),colour="yellow",size=1)+
+    coord_cartesian(xlim=c(1965,2025))+labs(x="Time",y="Prevalence (%)", title=plot_name)
+  
+  incidence_plot<-ggplot(data=df_fit_incidence)+geom_line(aes(x=time,y=median),colour="midnightblue",size=1)+
+    geom_ribbon(aes(x=time,ymin=low,ymax=high),fill="midnightblue",alpha=0.2,colour="midnightblue")+
+    geom_line(data = sim_output,aes(x=time,y=lambda),colour="yellow",size=1)+
+    labs(x="time",y="incidence",title="incidence_plot")
+  
+  r_plot<- ggplot(data = r_fit)+geom_line(aes(x=time,y=median),colour="midnightblue",size=1)+
+    geom_ribbon(aes(x=time,ymin=low,ymax=high),fill="midnightblue",colour="midnightblue",alpha=0.2)+
+    geom_line(data = sim_output,aes(x=time,y=kappa),colour="yellow",size=1)
+  labs(x="Time",y="r value through time",title="R logistic through time")
+  return(list(prevalence_plot=(plotter),df_output=df_fit_prevalence,incidence_df=df_fit_incidence,
+              r_fit_df=r_fit,incidence_plot=incidence_plot,r_plot=r_plot,sigma_pen_values=sigma_df,iota_value=params_df,
+              iota_dist=iota_dist,sigma_pen_dist=sigma_pen_dist))
+  
+  
+}
+
+
+xout<-seq(1970,2020,0.1)
+
+
+test_peno<-plot_stan_model_fit(model_output = mod_hiv_prev,
+                               plot_name = "Random walk second order",xout = xout,
+                               sim_output = sim_model_output$sim_df)
+test_peno$prevalence_plot
+test_peno$incidence_plot
+test_peno$r_plot
+
   
   
 
