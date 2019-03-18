@@ -84,7 +84,7 @@ data {
 
  int estimate_period;                                                   // Number of years we predict data for
 
- matrix[time_steps_euler - 1  , time_steps_year  ] X_design;                // This is our spline design matirx that we are modelling kappa with.
+ matrix[time_steps_euler - 1, time_steps_year  ] X_design;                // This is our spline design matirx that we are modelling kappa with.
 
  matrix[time_steps_year - penalty_order , time_steps_year ] D_penalty;  // This is our penalty matrix, can be first or second order depending on the R code
 
@@ -101,6 +101,8 @@ data {
  real dt_2;                                                             // this is our second time step for generating the output from the fitted beta parameters
 
  int rows_to_interpret[n_obs];                             // This is a vector of the rows to use for the prevalence stats in y_hat. Corresponds to whole years
+ 
+ int poisson_or_negbin;                                    // This variable is 0 for poisson or 1 for using the negbin dist
 
   }
 
@@ -112,9 +114,11 @@ parameters{
 
  vector[cols(X_design)] beta;                                  // This is the knot point values
 
- real<lower = 0, upper =1> sigma_pen;                          // This is the penalty to apply to the spline to make it smooth
-
-
+ real<lower = 0> sigma_pen;                          // This is the penalty to apply to the spline to make it smooth
+ 
+ 
+ real<lower= 0> phi_pen;
+ 
  }
 
 
@@ -128,15 +132,23 @@ transformed parameters{
 
 model {
 
+sigma_pen ~ normal(0, 1);
 
+beta ~ normal(0, 5);
+phi_pen ~ normal(0, 10);
 
  iota ~ normal(0, 0.25);                                                  // This models our initial population size
 
  target += normal_lpdf( D_penalty * beta | 0, sigma_pen);                // So this models our penalized spline with a slightly altered distribution command
 
- y ~ poisson(y_hat);                                          // This fits it to the binomially sampled data
 
+if(poisson_or_negbin == 1){
 
+ target += neg_binomial_2_lpmf (y | y_hat, phi_pen);                                          // This fits it to the binomially sampled data
+}else{
+  target += poisson_lpmf (y | y_hat);
+  
+}
 }
 
 generated quantities{
