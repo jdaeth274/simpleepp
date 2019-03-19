@@ -132,10 +132,10 @@ transformed parameters{
 
 model {
 
-sigma_pen ~ normal(0, 1);
+sigma_pen ~ normal(0, 5);
 
-beta ~ normal(0, 5);
-phi_pen ~ normal(0, 10);
+beta ~ normal(0, 7.5);
+phi_pen ~ normal(0, 20);
 
  iota ~ normal(0, 0.25);                                                  // This models our initial population size
 

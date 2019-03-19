@@ -171,7 +171,8 @@ stan_data_discrete<-list(
   delta = delta,
   dt = 1,
   dt_2 = 0.1,
-  rows_to_interpret = as.array(rows_to_evaluate)
+  rows_to_interpret = as.array(rows_to_evaluate),
+  poisson_or_negbin = 1
 )
 
 params_monitor_hiv<-c("y_hat","iota","fitted_output","beta","sigma_pen", "phi_pen")  
@@ -185,7 +186,7 @@ Sys.time()
 mod_hiv_prev_pen_2 <- stan("~/Dropbox/jeff_hiv_work/simpleepp/stan_files/chunks/SID_models/SID_model.stan",
                      data = stan_data_discrete,
                      pars = params_monitor_hiv,chains = 3,warmup = 500,iter = 1500,
-                     control = list(adapt_delta = 0.9))
+                     control = list(adapt_delta = 0.99))
 Sys.time()
 
 diags_df <- cbind.data.frame(diags_data, xout[rows_to_evaluate])
@@ -210,6 +211,18 @@ plot_stan_model_fit<-function(model_output,sim_output,plot_name,xout, diags_dat)
   sigma_high<-quantile(posts_hiv$sigma_pen,probs=c(0.975))
   sigma_df<-rbind.data.frame(sigma_low,sigma_values,sigma_high)
   names(sigma_df)<-c("sigma_pen")
+  
+  phi_vals_median <- median(posts_hiv$phi_pen)
+  phi_low<-quantile(posts_hiv$phi_pen,c(0.025))
+  phi_high<-quantile(posts_hiv$phi_pen,probs=c(0.975))
+  phi_df<-rbind.data.frame(phi_low,phi_vals_median,phi_high)
+  names(phi_df)<-c("phi_pen")
+  
+  beta_vals_median <- apply(posts_hiv$beta, 2, median)
+  beta_vals_low <- apply(posts_hiv$beta,2, quantile, probs=(0.025))
+  beta_vals_high <- apply(posts_hiv$beta, 2, quantile, probs=(0.975))
+  beta_df<-cbind.data.frame(beta_vals_low,beta_vals_median,beta_vals_high)
+  names(beta_df)<-c("low","median","high")
   
   
   
@@ -292,7 +305,8 @@ plot_stan_model_fit<-function(model_output,sim_output,plot_name,xout, diags_dat)
   
   return(list(prevalence_plot=(plotter),df_output=df_fit_prevalence,incidence_df=df_fit_incidence,
               r_fit_df=r_fit,incidence_plot=incidence_plot,r_plot=r_plot,sigma_pen_values=sigma_df,iota_value=params_df,
-              iota_dist=iota_dist,sigma_pen_dist=sigma_pen_dist, diags_plot = diags_plot, diags_deef = diags_fit))
+              iota_dist=iota_dist,sigma_pen_dist=sigma_pen_dist, diags_plot = diags_plot, diags_deef = diags_fit,
+              phi_vals = phi_df, beta_df = beta_df))
   
   
 }
@@ -308,6 +322,9 @@ test_peno_2$prevalence_plot
 test_peno_2$incidence_plot
 test_peno_2$r_plot
 test_peno_2$diags_plot
+test_peno_2$phi_vals
+test_peno_2$sigma_pen_values
+test_peno_2$beta_df
 
 ###############################################################################
 ## Lets do one for the RW first order methods #################################
