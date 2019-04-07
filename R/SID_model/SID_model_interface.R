@@ -5,11 +5,12 @@ require(reshape2)
 require(splines)
 require(ggplot2)
 require(rstan)
+require(ggpubr)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
 
-expose_stan_functions("./simpleepp/stan_files/chunks/SID_models/SID_model.stan")
+expose_stan_functions("~/Dropbox/jeff_hiv_work/simpleepp/stan_files/chunks/SID_models/SID_model.stan")
 
 ###############################################################################
 ## Now lets run the simulated model from the STAN functions ###################
@@ -303,10 +304,13 @@ plot_stan_model_fit<-function(model_output,sim_output,plot_name,xout, diags_dat)
     geom_point(data = diags_dat, aes(x= time, y= diags), colour = "red", size = 1)+
     labs(x = "Time", y = "diagnoses", title = "New diagnoses through time" )
   
+  
+  combed_plot <- ggarrange(plotter, incidence_plot, r_plot, diags_plot, ncol = 2, nrow = 2)
+  
   return(list(prevalence_plot=(plotter),df_output=df_fit_prevalence,incidence_df=df_fit_incidence,
               r_fit_df=r_fit,incidence_plot=incidence_plot,r_plot=r_plot,sigma_pen_values=sigma_df,iota_value=params_df,
               iota_dist=iota_dist,sigma_pen_dist=sigma_pen_dist, diags_plot = diags_plot, diags_deef = diags_fit,
-              phi_vals = phi_df, beta_df = beta_df))
+              phi_vals = phi_df, beta_df = beta_df, combed_plot = combed_plot))
   
   
 }
@@ -325,6 +329,8 @@ test_peno_2$diags_plot
 test_peno_2$phi_vals
 test_peno_2$sigma_pen_values
 test_peno_2$beta_df
+test_peno_2$combed_plot
+
 
 ###############################################################################
 ## Lets do one for the RW first order methods #################################

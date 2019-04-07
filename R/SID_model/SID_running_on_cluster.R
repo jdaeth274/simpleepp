@@ -2,11 +2,10 @@
 ## Setting up the SID model for the DIDE cluster ##############################
 ###############################################################################
 
-setwd("~/homes_drive")
-options(didehpc.username = "jd2117",didehpc.home = "~/homes_drive/simpleepp",didehpc.cluster = "fi--didemrchnb")
+setwd("~/HOMES_drive/")
+options(didehpc.username = "jd2117",didehpc.home = "~/HOMES_drive/simpleepp",didehpc.cluster = "fi--didemrchnb")
 
 didehpc::didehpc_config(cores = 3,parallel = FALSE)
-?didehpc::didehpc_config
 
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ##
 ## !!!!!!!!!!!!!!!!!!!!!!!! Remember to turn on pulse secure at this point !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -31,6 +30,7 @@ obj$task_status()
 
 
 diag_samples <- read.table("~/Dropbox/jeff_hiv_work/simpleepp/analysis/SID_models_diag_10_3_2019.tsv")
+diag_samples <- diag_samples[-1,]
 
 
 mu <- 1/35                               # Non HIV mortality / exit from population
@@ -52,25 +52,32 @@ xout <- c(xstart, step_vector)                #the vector of steps in total
 ## Now we will run through the data from begininng ################################################################################
 ###################################################################################################################################
 
-sample_range<-1970:2015
+sample_range<-1974:2015
                             ##### !!!!!!!!!!!!!!!!!!!!!! Remember to change this for when you sample
 penalty_order<-1
-sample_start<-sample_range[1]-1970
-rows_to_evaluate<- sample_start:45*10+1   #(time_points_to_sample - 1970) * 10 + 1                 ## If using all data points must use 0:45*10+1
+rows_to_evaluate<-4:45*10+1
+diag_samples <- diag_samples[,-c(1:4)]
 
 data_about_sampling<-list(penalty_order=penalty_order,sample_years=length(sample_range),
                           rows_to_evaluate=rows_to_evaluate, mu = mu,
-                          mu_i = mu_i, delta = delta, iota = iota, dt = dt)
+                          mu_i = mu_i, delta = delta, iota = iota, dt = dt, check_rhat = FALSE)
 
-diag_SID_model_test <- fitting_SID_model(samples_data_frame = diag_samples, 
+diag_SID_model_test <- obj$enqueue(fitting_SID_model(samples_data_frame = diag_samples, 
                                                                   data_about_sampling = data_about_sampling,
                                                                   iteration_number = 100,params = params,
-                                                                  simulated_true_df = sim_model_output$sim_df)
+                                                                  simulated_true_df = sim_model_output$sim_df), 
+                                   name = "SID model Neg Binom")
                        
 
 
-diag_SID_model_test$log()
-n_100_RW_first_order_loop_id<-n_100_RW_first_order_loop$id
-save(n_100_RW_first_order_loop_id,
-     file = "C:/Users/josh/Dropbox/hiv_project/analysis_of_cluster_run_datasets/log_narrow_sigma/simplepp_early_sampling/cluster_ids/RW_100_FIRST_12_16_JUNE_11")
+diag_SID_model_test$status()
+diag_SID_model_test$context_id()
 
+diag_sid_mod_id <- diag_SID_model_test$id
+diag_SID_model_test$id
+
+n_100_RW_first_order_loop_id<-n_100_RW_first_order_loop$id
+save(diag_sid_mod_id,
+     file = "~/Dropbox/jeff_hiv_work/simpleepp/data/SID_mod_cluster_id_23_3_19")
+load("~/Dropbox/jeff_hiv_work/simpleepp/data/SID_mod_cluster_id_23_3_19", verbose = T)
+diag_SID_model_test <- obj$task_get(diag_sid_mod_id)
