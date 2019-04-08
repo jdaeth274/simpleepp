@@ -60,6 +60,9 @@ functions{
       rho[t+1] = 1.0 - S[t+1] / (S[t+1] + sum(I[ ,t+1]) + sum(D[,t+1]));
       
       diagns[t] = Dt;
+      if (t == rows(kappa)){
+        diagns[t + 1] = sum(D[,rows(kappa) + 1]);
+      }
       
     }
     
@@ -78,9 +81,9 @@ functions{
     num_rows = rows(multiplicative_vals) + 1;
     delta_c = to_row_vector(delta_curve);
     
-    delta_out[1,] = exp(delta_c);
+    delta_out[1,] = delta_c;
     for (n in 2:num_rows)
-      delta_out[n,] = exp(delta_c) * multiplicative_vals[ n - 1 ];
+      delta_out[n,] = delta_c * multiplicative_vals[ n - 1 ];
       
     return(delta_out);
   }
@@ -113,7 +116,6 @@ data {
   
   vector[5] mu_i;                                                        // This is our vector of death rates
   
-  matrix[4, time_steps_euler] delta; 
   
   real dt;                                                               // This is our time step
   
@@ -153,21 +155,21 @@ transformed parameters{
   
   vector[size(rows_to_interpret)] y_hat;
   
-  y_hat = simpleepp_no_art( exp(X_design * beta) , iota, mu, sigma, delta_getter(X_design_diag * delta_beta), multiplicative_vals), mu_i, dt_2)[rows_to_interpret, 4];
+  y_hat = simpleepp_no_art( exp(X_design * beta) , iota, mu, sigma, delta_getter((exp(X_design_diag * delta_beta)), multiplicative_vals), mu_i, dt_2)[rows_to_interpret, 4];
 }
 
 
 model {
   
   sigma_pen ~ normal(0, 5);
-  sigma_pen_delta ~ normal(0, 10);
-  delta_beta ~ normal(0, 15);
+  sigma_pen_delta ~ normal(0, 5);
+  delta_beta ~ normal(0, 2.5);
   
   
-  beta ~ normal(0, 7.5);
+  beta ~ normal(0, 2.5);
   phi_pen ~ normal(0, 20);
   
-  iota ~ normal(0, 0.25);                                                  // This models our initial population size
+  iota ~ normal(0, 0.1);                                                  // This models our initial population size
   
   target += normal_lpdf( D_penalty * beta | 0, sigma_pen);                // So this models our penalized spline with a slightly altered 
   
@@ -187,7 +189,7 @@ generated quantities{
   
   matrix[time_steps_euler , 4] fitted_output;
   vector[rows(X_design)] fitted_kappa;
-  matrix[rows(delta), rows(X_design_diag)] fitted_delta;
+  matrix[4, rows(X_design_diag)] fitted_delta;
   
   fitted_kappa = exp(X_design * beta);
   fitted_delta = delta_getter(exp(X_design_diag * delta_beta), multiplicative_vals);

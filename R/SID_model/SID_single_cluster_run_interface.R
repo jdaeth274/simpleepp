@@ -9,8 +9,8 @@ require(ggpubr)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
-setwd("~/homes_drive/")
-options(didehpc.username = "jd2117",didehpc.home = "~/homes_drive/simpleepp",didehpc.cluster = "fi--didemrchnb")
+setwd("~/HOMES_drive/")
+options(didehpc.username = "jd2117",didehpc.home = "~/HOMES_drive/simpleepp",didehpc.cluster = "fi--didemrchnb")
 
 didehpc::didehpc_config(cores = 3,parallel = FALSE)
 
@@ -198,10 +198,10 @@ diags_data <- data_collector(sim_model_output$sim_df, year_range, xstart)
 
 
 
-xord<-seq(1970.1,2020,0.1)
-xord_diag <- seq(1970,2020,0.1)
-spline_matrix<-splineDesign(1969:2021,xord,ord = 2)            ## This matrix is the spline design one 
-spline_mat_diag <- splineDesign(1969:2021,xord_diag,ord = 2)
+xord<-seq(1970.1,2015,0.1)
+xord_diag <- seq(1970,2015,0.1)
+spline_matrix<-splineDesign(1969:2016,xord,ord = 2)            ## This matrix is the spline design one 
+spline_mat_diag <- splineDesign(1969:2016,xord_diag,ord = 2)
 penalty_matrix<-diff(diag(ncol(spline_matrix)), diff=2)        ## This matrix creates the differences between your kappa values 
 rows_to_evaluate<-3:45*10+1
 
@@ -210,10 +210,10 @@ diags_data <- diags_data[,-c(1:3)]
 stan_data_discrete<-list(
   n_obs = length(diags_data),
   y = as.vector(diags_data),
-  time_steps_euler = 501,
+  time_steps_euler = 451,
   penalty_order = 2,
-  estimate_period = 5,
-  time_steps_year = 51,
+  estimate_period = 0,
+  time_steps_year = 46,
   X_design = spline_matrix,
   X_design_diag = spline_mat_diag,
   D_penalty = penalty_matrix,
@@ -241,3 +241,187 @@ mod_hiv_prev_pen_2 <- obj$enqueue(single_run_rw_delta(stan_data = stan_data_disc
                            adapt_delta = 0.95), name = "single_run_rw")
 mod_hiv_prev_pen_2$status()
 mod_hiv_prev_pen_2$log()
+
+single_run_res <- mod_hiv_prev_pen_2$result()
+
+###############################################################################
+## Now lets analyse the results ###############################################
+###############################################################################
+
+diags_df <- cbind.data.frame(diags_data, xout[rows_to_evaluate])
+names(diags_df) <- c("diags","time")
+
+plot_stan_model_fit<-function(model_output,sim_output,plot_name,xout, diags_dat, X_Design){
+  
+  posts_hiv <- rstan::extract(model_output)
+  
+  
+  iota_dist<-posts_hiv$iota
+  params<-median(posts_hiv$iota)
+  params_low<-quantile(posts_hiv$iota,c(0.025))
+  params_high<-quantile(posts_hiv$iota,c(0.975))
+  
+  params_df<-rbind.data.frame(params_low,params,params_high)
+  names(params_df)<-c("iota")
+  
+  sigma_pen_dist<-posts_hiv$sigma_pen
+  sigma_values<-median(posts_hiv$sigma_pen)
+  sigma_low<-quantile(posts_hiv$sigma_pen,c(0.025))
+  sigma_high<-quantile(posts_hiv$sigma_pen,probs=c(0.975))
+  sigma_df<-rbind.data.frame(sigma_low,sigma_values,sigma_high)
+  names(sigma_df)<-c("sigma_pen")
+  
+  phi_vals_median <- median(posts_hiv$phi_pen)
+  phi_low<-quantile(posts_hiv$phi_pen,c(0.025))
+  phi_high<-quantile(posts_hiv$phi_pen,probs=c(0.975))
+  phi_df<-rbind.data.frame(phi_low,phi_vals_median,phi_high)
+  names(phi_df)<-c("phi_pen")
+  
+  beta_vals_median <- apply(posts_hiv$beta, 2, median)
+  beta_vals_low <- apply(posts_hiv$beta,2, quantile, probs=(0.025))
+  beta_vals_high <- apply(posts_hiv$beta, 2, quantile, probs=(0.975))
+  beta_df<-cbind.data.frame(beta_vals_low,beta_vals_median,beta_vals_high)
+  names(beta_df)<-c("low","median","high")
+  
+  diag_beta_median <-  X_Design %*%  exp(apply(posts_hiv$delta_beta, 2, median)) 
+  diag_beta_low <- X_Design %*% exp(apply(posts_hiv$delta_beta, 2, quantile, probs=(0.025))) 
+  diag_beta_high <- X_Design %*% exp(apply(posts_hiv$delta_beta, 2, quantile, probs=(0.975))) 
+  diag_beta_df <- cbind.data.frame(diag_beta_low, diag_beta_median, diag_beta_high)
+  names(diag_beta_df) <- c("low","median","high")
+  
+  
+  # These should match well. 
+  
+  #################
+  # Plot model fit:
+  
+  # Proportion infected from the synthetic data:
+  
+  #sample_prop = sample_y / sample_n
+  
+  # Model predictions across the sampling time period.
+  # These were generated with the "fake" data and time series.
+  #mod_median = apply(posts_hiv$fake_I[,,2], 2, median)
+  #mod_low = apply(posts_hiv$fake_I[,,2], 2, quantile, probs=c(0.025))
+  #mod_high = apply(posts_hiv$fake_I[,,2], 2, quantile, probs=c(0.975))
+  mod_time = xout
+  
+  
+  
+   prev_median<-(apply(posts_hiv$fitted_output[,,3],2,median))*100
+   prev_low<-(apply(posts_hiv$fitted_output[,,3],2,quantile,probs=c(0.025)))*100
+   prev_high<-(apply(posts_hiv$fitted_output[,,3],2,quantile,probs=c(0.975)))*100
+   
+  
+  incidence_median<-apply(posts_hiv$fitted_output[,,2],2,median)
+  incidence_low<-apply(posts_hiv$fitted_output[,,2],2,quantile,probs=c(0.025))
+  incidence_high<-apply(posts_hiv$fitted_output[,,2],2,quantile,probs=c(0.975))
+  
+  r_median<-apply(posts_hiv$fitted_output[,,1],2,median)
+  r_low<-apply(posts_hiv$fitted_output[,,1],2,quantile,probs=c(0.025))
+  r_high<-apply(posts_hiv$fitted_output[,,1],2,quantile,probs=c(0.975))
+  
+  
+  diags_median <- apply(posts_hiv$fitted_output[,,4], 2, median)
+  diags_low <- apply(posts_hiv$fitted_output[,,4], 2, quantile, probs=c(0.025), na.rm = TRUE)
+  diags_high <- apply(posts_hiv$fitted_output[,,4], 2, quantile, probs=c(0.975), na.rm = TRUE)
+  
+  # Combine into two data frames for plotting
+  #df_sample = data.frame(sample_prop, sample_time)
+   df_fit_prevalence = data.frame(prev_median, prev_low, prev_high, xout )
+   names(df_fit_prevalence)<-c("median","low","high","time")
+   df_fit_prevalence$credible_skew<-(df_fit_prevalence$high - df_fit_prevalence$median) - (df_fit_prevalence$median - df_fit_prevalence$low)
+  # 
+  df_fit_incidence<-data.frame(incidence_low,incidence_median,incidence_high,xout)
+  names(df_fit_incidence)<-c("low","median","high","time")
+  
+  r_fit<-data.frame(r_low,r_median,r_high,xout)
+  names(r_fit)<-c("low","median","high","time")
+  
+  diags_fit <- data.frame(diags_low, diags_median, diags_high, xout)
+  names(diags_fit) <- c("low","median","high","time")
+  # 
+  diag_beta_df$time <- xout
+  # 
+  real_diag_rates <- data.frame(t(sim_output$delta_vals))
+  names(real_diag_rates) <- "orig_curve"
+  real_diag_rates$time <- xout
+  
+  
+   plotter<- ggplot(data = df_fit_prevalence) + 
+     geom_line(data = df_fit_prevalence, aes(x=time,y=median),colour="midnightblue",size=1)+
+     geom_ribbon(data = df_fit_prevalence,aes(x=time,ymin=low,ymax=high),
+                 colour="midnightblue",alpha=0.2,fill="midnightblue")+
+     geom_line(data = sim_output$sim_df,aes(x=time,y=prev_percent),colour="yellow",size=1)+
+     coord_cartesian(xlim=c(1965,2025))+labs(x="Time",y="Prevalence (%)", title=plot_name)
+   
+  incidence_plot<-ggplot(data=df_fit_incidence)+geom_line(aes(x=time,y=median),colour="midnightblue",size=1)+
+    geom_ribbon(aes(x=time,ymin=low,ymax=high),fill="midnightblue",alpha=0.2,colour="midnightblue")+
+    geom_line(data = sim_output$sim_df,aes(x=time,y=lambda),colour="yellow",size=1)+
+    labs(x="time",y="incidence",title="incidence_plot")
+  
+  r_plot<- ggplot(data = r_fit)+geom_line(aes(x=time,y=median),colour="midnightblue",size=1)+
+    geom_ribbon(aes(x=time,ymin=low,ymax=high),fill="midnightblue",colour="midnightblue",alpha=0.2)+
+    geom_line(data = sim_output$sim_df,aes(x=time,y=kappa),colour="yellow",size=1)+
+    labs(x="Time",y="r value through time",title="R logistic through time")
+  
+  diags_plot <- ggplot(data = diags_fit) + geom_line(aes(x = time, y = median), colour = "midnightblue", size = 1)+
+    geom_ribbon(aes(x = time, ymin = low, ymax = high), fill = "midnightblue", colour = "midnightblue", alpha =0.2)+
+    geom_line(data = sim_output$sim_df, aes(x= time, y = diagnoses), colour = "yellow", size = 1)+
+    geom_point(data = diags_dat, aes(x= time, y= diags), colour = "red", size = 1)+
+    labs(x = "Time", y = "diagnoses", title = "New diagnoses through time" )
+  
+  diag_rate_plot <- ggplot(data = diag_beta_df) + geom_line(aes(x = time, y = median), colour = "midnightblue", size = 1) +
+    geom_ribbon(aes(x = time, ymin = low, ymax = high), fill = "midnightblue", colour = "midnightblue", alpha = 0.2)+
+    geom_line(data = real_diag_rates, aes(x = time, y = orig_curve), colour = "yellow", size = 1) 
+  
+  combed_plot <- ggarrange(plotter, incidence_plot, r_plot, diags_plot, ncol = 2, nrow = 2)
+  
+  
+  return(list(prevalence_plot=(plotter),df_output=df_fit_prevalence,incidence_df=df_fit_incidence,
+              r_fit_df=r_fit,incidence_plot=incidence_plot,r_plot=r_plot,sigma_pen_values=sigma_df,iota_value=params_df,
+              iota_dist=iota_dist,sigma_pen_dist=sigma_pen_dist, diags_plot = diags_plot, diags_deef = diags_fit,
+              phi_vals = phi_df, beta_df = beta_df, combed_plot = combed_plot, diag_rate_plot = diag_rate_plot))
+  
+  
+}
+
+
+xout<-seq(1970,2015,0.1)
+
+
+test_peno_5<-plot_stan_model_fit(model_output = single_run_res,
+                                 plot_name = "Random walk second order",xout = xout,
+                                 sim_output = sim_model_output, diags_dat = diags_df,
+                                 X_Design = stan_data_discrete$X_design_diag)
+test_peno_2$diag_rate_plot
+test_peno_2$prevalence_plot
+test_peno_2$incidence_plot
+test_peno_2$r_plot
+test_peno_2$diags_plot
+test_peno_2$diag_rate_plot
+test_peno_2$phi_vals
+test_peno_2$sigma_pen_values
+plot(exp(test_peno_2$beta_df$median))
+
+test_peno_3$diag_rate_plot
+test_peno_3$prevalence_plot
+test_peno_3$incidence_plot
+test_peno_3$r_plot
+test_peno_3$diags_plot
+
+test_peno_4$diag_rate_plot
+test_peno_4$prevalence_plot
+test_peno_4$incidence_plot
+test_peno_4$r_plot
+test_peno_4$diags_plot
+test_peno_4$diags_deef
+
+test_peno_5$diag_rate_plot
+test_peno_5$prevalence_plot
+test_peno_5$incidence_plot
+test_peno_5$r_plot
+test_peno_5$diags_plot
+test_peno_5$diags_deef
+
+
