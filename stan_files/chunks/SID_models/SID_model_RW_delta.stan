@@ -12,6 +12,8 @@ functions{
     // rho is our I/N so when multipled by kappa it becomes our force of infection
     vector[rows(kappa)+1] lambda;         // This is our force of infection
     int DS;
+    vector[rows(kappa) + 1] undiag;
+    vector[rows(kappa) + 1] aids_deaths;
     DS = rows(sigma);
     
     
@@ -35,15 +37,19 @@ functions{
       real diagnoses;
       real Dt;
       real It;
+      real aids_death;
       
       
       It = sum(I[,t]);
       Dt = sum(D[,t]);
       
+      undiag[t] = It;
       
       lambda[t+1] = kappa[t] * rho[t];
       
       deaths = mu * (S[t] + It + Dt) + sum(mu_i[1:4] .* I[,t]) + sum(mu_i .* D[,t]);
+      aids_death = mu_i[5] * D[5,t];
+      aids_deaths[t] = aids_death;
       S[t+1] = S[t] + dt*(-lambda[t+1] * S[t] - mu * S[t] + deaths);                            // I think + deaths here is to 
       // keep the pop size constant
       
@@ -68,7 +74,7 @@ functions{
     
     
     return(append_col(append_col(append_row(kappa[1], kappa),
-                                 append_col(lambda, rho)), diagns));
+                                 append_col(lambda, rho)),append_col(diagns, append_col(undiag, aids_deaths))));
   }
   
   matrix delta_getter(vector delta_curve, vector multiplicative_vals){
@@ -142,7 +148,7 @@ parameters{
   
   real<lower= 0> phi_pen;                                       //This is the variance paramter for the neg binom model 
   
-  vector[cols(X_design)] delta_beta;                            // These are the knot values for the diagnoses curve
+  vector<upper = 0.1>[cols(X_design)] delta_beta;                            // These are the knot values for the diagnoses curve
   
   real<lower= 0> sigma_pen_delta;                               // This is our sigma_penalty for the delta RW
   
@@ -162,8 +168,8 @@ transformed parameters{
 model {
   
   sigma_pen ~ normal(0, 5);
-  sigma_pen_delta ~ normal(0, 5);
-  delta_beta ~ normal(0, 2.5);
+  sigma_pen_delta ~ normal(0, 10);
+  delta_beta ~ normal(0.1, 3);
   
   
   beta ~ normal(0, 2.5);
@@ -187,7 +193,7 @@ model {
 
 generated quantities{
   
-  matrix[time_steps_euler , 4] fitted_output;
+  matrix[time_steps_euler , 6] fitted_output;
   vector[rows(X_design)] fitted_kappa;
   matrix[4, rows(X_design_diag)] fitted_delta;
   
