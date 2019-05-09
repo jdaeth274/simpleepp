@@ -220,17 +220,17 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="1"
-     inkscape:cx="470.45543"
-     inkscape:cy="754.28571"
+     inkscape:zoom="0.70710678"
+     inkscape:cx="493.08285"
+     inkscape:cy="620.35173"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
-     inkscape:window-width="927"
+     inkscape:window-width="1853"
      inkscape:window-height="1025"
      inkscape:window-x="67"
      inkscape:window-y="27"
-     inkscape:window-maximized="0" />
+     inkscape:window-maximized="1" />
   <metadata
      id="metadata5">
     <rdf:RDF>
@@ -869,5 +869,55 @@
            y="195.51968" /></flowRegion><flowPara
          id="flowPara2311-55">σ<flowSpan
    style="font-size:64.99999762%;baseline-shift:sub"
-   id="flowSpan2497">4</flowSpan></flowPara></flowRoot>  </g>
+   id="flowSpan2497">4</flowSpan></flowPara></flowRoot>    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:7.05555534px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="188.91249"
+       y="83.745834"
+       id="text2501"><tspan
+         sodipodi:role="line"
+         id="tspan2499"
+         x="188.91249"
+         y="89.98835"
+         style="stroke-width:0.26458332" /></text>
+    <flowRoot
+       xml:space="preserve"
+       id="flowRoot2503"
+       style="font-style:normal;font-weight:normal;font-size:26.66666603px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
+       transform="matrix(0.26458333,0,0,0.26458333,-4.1159507,-11.22532)"><flowRegion
+         id="flowRegion2505"><rect
+           id="rect2507"
+           width="537.40112"
+           height="309.71283"
+           x="53.740116"
+           y="763.30945" /></flowRegion><flowPara
+         id="flowPara2509">ρ = Proportion of population infected</flowPara><flowPara
+         id="flowPara2511">κ = Transmission parameter</flowPara><flowPara
+         id="flowPara2513">δ = Diagnosis rate </flowPara><flowPara
+         id="flowPara2515">σ = Progression rate</flowPara><flowPara
+         id="flowPara2519"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-family:sans-serif;-inkscape-font-specification:'sans-serif Bold'">Modelling:</flowPara><flowPara
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:sans-serif;-inkscape-font-specification:sans-serif"
+         id="flowPara2523"><flowSpan
+   style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-family:sans-serif;-inkscape-font-specification:'sans-serif Bold'"
+   id="flowSpan2541">κ</flowSpan> as 2<flowSpan
+   style="font-size:64.99999762%;baseline-shift:super"
+   id="flowSpan2533">nd</flowSpan> order penalized RW,</flowPara><flowPara
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:sans-serif;-inkscape-font-specification:sans-serif"
+         id="flowPara2527"><flowSpan
+   style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-family:sans-serif;-inkscape-font-specification:'sans-serif Bold'"
+   id="flowSpan2543">δ</flowSpan><flowSpan
+   style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:64.99999762%;font-family:sans-serif;-inkscape-font-specification:'sans-serif Bold';baseline-shift:sub"
+   id="flowSpan2539">1</flowSpan> as 2<flowSpan
+   style="font-size:64.99999762%;baseline-shift:super"
+   id="flowSpan2537">nd</flowSpan> order penalized RW, </flowPara><flowPara
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:sans-serif;-inkscape-font-specification:sans-serif"
+         id="flowPara2529">subsequent δ found via * δ<flowSpan
+   style="font-size:64.99999762%;baseline-shift:sub"
+   id="flowSpan2535">1</flowSpan> by </flowPara><flowPara
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:sans-serif;-inkscape-font-specification:sans-serif"
+         id="flowPara2531">constants input into model</flowPara><flowPara
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-family:sans-serif;-inkscape-font-specification:'sans-serif Bold'"
+         id="flowPara2521" /><flowPara
+         id="flowPara2517" /></flowRoot>  </g>
 </svg>

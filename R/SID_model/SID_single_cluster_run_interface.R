@@ -359,6 +359,8 @@ sim_plot<-function(sim_df){
 plotted_sim<-sim_plot(sim_model_output$sim_df)
 plot(plotted_sim$whole)
 plot(plotted_sim$diagnoses)
+plot(plotted_sim$undiagnosed)
+plot(plotted_sim$aids_deaths)
 
 ###############################################################################
 ## Now lets get our diagnoses data from this simulation #######################
@@ -423,7 +425,9 @@ stan_data_discrete<-list(
   dt_2 = 0.1,
   rows_to_interpret = as.array(rows_to_evaluate),
   poisson_or_negbin = 1,
-  multiplicative_vals = c(1.02,1.04,1.1)
+  multiplicative_vals = c(1.02,1.04,1.1),
+  delta_priors = c(0,5,0.1,3),
+  kappa_priors = c(0,5,0,2.5)
 )
 
 params_monitor_hiv<-c("y_hat","iota","fitted_output","beta","sigma_pen", "phi_pen", "delta_beta")  
@@ -600,7 +604,8 @@ plot_stan_model_fit<-function(model_output,sim_output,plot_name,xout, diags_dat,
     labs(x="Time",y="AIDS deaths",title="AIDS deaths through time")
   
   
-  combed_plot <- ggarrange(plotter, incidence_plot, r_plot, diags_plot, ncol = 2, nrow = 2)
+  combed_plot <- ggarrange(plotter, incidence_plot, r_plot, diags_plot, diag_rate_plot,
+                           undiag_plot, aids_deaths_plot, ncol = 2, nrow = 4)
   
   
   return(list(prevalence_plot=(plotter),df_output=df_fit_prevalence,incidence_df=df_fit_incidence,
@@ -616,7 +621,7 @@ plot_stan_model_fit<-function(model_output,sim_output,plot_name,xout, diags_dat,
 xout<-seq(1970,2015,0.1)
 
 
-test_peno_7<-plot_stan_model_fit(model_output = single_run_res,
+test_peno_8<-plot_stan_model_fit(model_output = single_run_res,
                                  plot_name = "Random walk second order",xout = xout,
                                  sim_output = sim_model_output, diags_dat = diags_df,
                                  X_Design = stan_data_discrete$X_design_diag)
@@ -643,3 +648,498 @@ test_peno_7$diags_plot
 test_peno_7$diags_deef
 test_peno_7$undiag_plot
 test_peno_7$aids_deaths_plot
+
+test_peno_8$diag_rate_plot
+test_peno_8$prevalence_plot
+test_peno_8$incidence_plot
+test_peno_8$r_plot
+test_peno_8$diags_plot
+test_peno_8$diags_deef
+test_peno_8$undiag_plot
+test_peno_8$aids_deaths_plot
+
+
+###############################################################################
+## Now we've added in the functionality to name the priors directly, lets run #
+## through the priors iteratively #############################################
+###############################################################################
+obj <- didehpc::queue_didehpc(ctx,config)
+
+
+run_ids_2 <- NULL
+prior_vals <- seq(from = 2, to = 4, length.out = 5)
+
+for(k in 1:5){
+  j <- prior_vals[k]
+  delta_priors <- c(0,(j*2),0.1,j)
+  kappa_priors <- c(0, (j*2), 0, j)
+  
+  stan_data_discrete<-list(
+    n_obs = length(diags_data),
+    y = as.vector(diags_data),
+    time_steps_euler = 451,
+    penalty_order = 2,
+    estimate_period = 0,
+    time_steps_year = 46,
+    X_design = spline_matrix,
+    X_design_diag = spline_mat_diag,
+    D_penalty = penalty_matrix,
+    mu = mu,
+    sigma = sigma,
+    mu_i = mu_i,
+    delta = delta,
+    dt = 1,
+    dt_2 = 0.1,
+    rows_to_interpret = as.array(rows_to_evaluate),
+    poisson_or_negbin = 1,
+    multiplicative_vals = c(1.02,1.04,1.1),
+    delta_priors = delta_priors,
+    kappa_priors = kappa_priors
+  )
+  
+  name_run <- paste("Prior_combo:",as.character(j))
+  
+  params_monitor_hiv<-c("y_hat","iota","fitted_output","beta","sigma_pen", "phi_pen", "delta_beta")
+  
+  cluster_run <- obj$enqueue(single_run_rw_delta(stan_data = stan_data_discrete,
+                                                        parameters_to_mon = params_monitor_hiv,
+                                                        warmup_length = 500,iter_length = 1500,
+                                                        adapt_delta = 0.95), name = name_run)
+  
+  print(cluster_run$status())
+  run_ids_2 <- c(run_ids_2, cluster_run$id)
+  run_name <- paste("cluster_run",j,sep = "_")
+  
+  
+
+}
+
+prior_1_combo <- obj$task_get(run_ids[1])
+prior_2_combo <- obj$task_get(run_ids[2])
+prior_3_combo <- obj$task_get(run_ids[3])
+prior_4_combo <- obj$task_get(run_ids[4])
+prior_5_combo <- obj$task_get(run_ids[5])
+
+prior_1_combo$status()
+prior_2_combo$status()
+prior_3_combo$status()
+prior_4_combo$status()
+prior_5_combo$status()
+
+prior_1_combo$log()
+prior_2_combo$log()
+prior_3_combo$log()
+prior_4_combo$log()
+prior_5_combo$log()
+
+prior_1_combo_res <- prior_1_combo$result()
+prior_2_combo_res <- prior_2_combo$result()
+prior_3_combo_res <- prior_3_combo$result()
+prior_4_combo_res <- prior_4_combo$result()
+prior_5_combo_res <- prior_5_combo$result()
+
+prior_res_2<-plot_stan_model_fit(model_output = prior_2_combo_res,
+                                 plot_name = "Random walk second order",xout = xout,
+                                 sim_output = sim_model_output, diags_dat = diags_df,
+                                 X_Design = stan_data_discrete$X_design_diag)
+
+prior_res_3<-plot_stan_model_fit(model_output = prior_3_combo_res,
+                                 plot_name = "Random walk second order",xout = xout,
+                                 sim_output = sim_model_output, diags_dat = diags_df,
+                                 X_Design = stan_data_discrete$X_design_diag)
+prior_res_4<-plot_stan_model_fit(model_output = prior_4_combo_res,
+                                 plot_name = "Random walk second order",xout = xout,
+                                 sim_output = sim_model_output, diags_dat = diags_df,
+                                 X_Design = stan_data_discrete$X_design_diag)
+prior_res_5<-plot_stan_model_fit(model_output = prior_5_combo_res,
+                                 plot_name = "Random walk second order",xout = xout,
+                                 sim_output = sim_model_output, diags_dat = diags_df,
+                                 X_Design = stan_data_discrete$X_design_diag)
+
+prior_res_2$combed_plot
+prior_res_3$combed_plot
+prior_res_4$combed_plot
+prior_res_5$combed_plot
+
+
+###############################################################################
+## So between 3 and 4 looks the best bet, lets look in more detail at these ###
+## results ####################################################################
+###############################################################################
+
+prior_2_combo <- obj$task_get(run_ids_2[1])
+prior_2.5_combo <- obj$task_get(run_ids_2[2])
+prior_3_combo <- obj$task_get(run_ids_2[3])
+prior_3.5_combo <- obj$task_get(run_ids_2[4])
+prior_4_combo <- obj$task_get(run_ids_2[5])
+
+prior_2_combo$status()
+prior_2.5_combo$status()
+prior_3_combo$status()
+prior_3.5_combo$status()
+prior_4_combo$status()
+
+prior_2_combo$log()
+prior_2.5_combo$log()
+prior_3_combo$log()
+prior_3.5_combo$log()
+prior_4_combo$log()
+
+prior_2_combo_res <- prior_2_combo$result()
+prior_2.5_combo_res <- prior_2.5_combo$result()
+prior_3_combo_res <- prior_3_combo$result()
+prior_3.5_combo_res <- prior_3.5_combo$result()
+prior_4_combo_res <- prior_4_combo$result()
+
+prior_res_2<-plot_stan_model_fit(model_output = prior_2_combo_res,
+                                 plot_name = "Random walk second order",xout = xout,
+                                 sim_output = sim_model_output, diags_dat = diags_df,
+                                 X_Design = stan_data_discrete$X_design_diag)
+
+prior_res_2.5<-plot_stan_model_fit(model_output = prior_2.5_combo_res,
+                                 plot_name = "Random walk second order",xout = xout,
+                                 sim_output = sim_model_output, diags_dat = diags_df,
+                                 X_Design = stan_data_discrete$X_design_diag)
+prior_res_3<-plot_stan_model_fit(model_output = prior_3_combo_res,
+                                 plot_name = "Random walk second order",xout = xout,
+                                 sim_output = sim_model_output, diags_dat = diags_df,
+                                 X_Design = stan_data_discrete$X_design_diag)
+prior_res_3.5<-plot_stan_model_fit(model_output = prior_3.5_combo_res,
+                                 plot_name = "Random walk second order",xout = xout,
+                                 sim_output = sim_model_output, diags_dat = diags_df,
+                                 X_Design = stan_data_discrete$X_design_diag)
+
+prior_res_4<-plot_stan_model_fit(model_output = prior_4_combo_res,
+                                   plot_name = "Random walk second order",xout = xout,
+                                   sim_output = sim_model_output, diags_dat = diags_df,
+                                   X_Design = stan_data_discrete$X_design_diag)
+
+
+prior_res_2$combed_plot
+prior_res_2.5$combed_plot
+prior_res_3$combed_plot
+prior_res_5$combed_plot
+
+
+###############################################################################
+## So the most promising of those results were between 2 and 3, lets try ######
+## out the difference between these two values ################################
+###############################################################################
+
+obj <- didehpc::queue_didehpc(ctx,config)
+
+testing_priors <- function(stan_data, prior_start, prior_end,
+                           length_o_priors){
+
+  run_ids_3 <- NULL
+  prior_vals <- seq(from = prior_start, to = prior_end,
+                    length.out = length_o_priors)
+  
+  for(k in 1:5){
+    j <- prior_vals[k]
+    delta_priors <- c(0,(j*2),0.1,j)
+    kappa_priors <- c(0, (j*2), 0, j)
+    
+    stan_data_discrete <- stan_data
+    stan_data_discrete$delta_priors <- delta_priors
+    stan_data_discrete$kappa_priors <- kappa_priors
+    
+    name_run <- paste("Prior_combo:",as.character(j))
+    
+    params_monitor_hiv<-c("y_hat","iota","fitted_output","beta","sigma_pen", "phi_pen", "delta_beta")
+    
+    cluster_run <- obj$enqueue(single_run_rw_delta(stan_data = stan_data_discrete,
+                                                   parameters_to_mon = params_monitor_hiv,
+                                                   warmup_length = 500,iter_length = 1500,
+                                                   adapt_delta = 0.95), name = name_run)
+    
+    print(cluster_run$status())
+    run_ids_3 <- c(run_ids_3, cluster_run$id)
+    
+    
+    
+  }
+  
+  return(run_ids_3)
+}
+
+run_2_3_outs <- testing_priors(stan_data_discrete, prior_start = 2,
+                               prior_end = 3, length_o_priors = 5)
+
+prior_2_combo <- obj$task_get(run_2_3_outs[1])
+prior_2.25_combo <- obj$task_get(run_2_3_outs[2])
+prior_2.5_combo <- obj$task_get(run_2_3_outs[3])
+prior_2.75_combo <- obj$task_get(run_2_3_outs[4])
+prior_3_combo <- obj$task_get(run_2_3_outs[5])
+
+prior_2_combo$status()
+prior_2.25_combo$status()
+prior_2.5_combo$status()
+prior_2.75_combo$status()
+prior_3_combo$status()
+
+prior_2_combo$log()
+prior_2.25_combo$log()
+prior_2.5_combo$log()
+prior_2.75_combo$log()
+prior_3_combo$log()
+
+prior_2_combo_res <- prior_2_combo$result()
+prior_2.25_combo_res <- prior_2.25_combo$result()
+prior_2.5_combo_res <- prior_2.5_combo$result()
+prior_2.75_combo_res <- prior_2.75_combo$result()
+prior_3_combo_res <- prior_3_combo$result()
+
+prior_res_2<-plot_stan_model_fit(model_output = prior_2_combo_res,
+                                 plot_name = "Random walk second order",xout = xout,
+                                 sim_output = sim_model_output, diags_dat = diags_df,
+                                 X_Design = stan_data_discrete$X_design_diag)
+
+prior_res_2.25<-plot_stan_model_fit(model_output = prior_2.25_combo_res,
+                                   plot_name = "Random walk second order",xout = xout,
+                                   sim_output = sim_model_output, diags_dat = diags_df,
+                                   X_Design = stan_data_discrete$X_design_diag)
+prior_res_2.5<-plot_stan_model_fit(model_output = prior_2.5_combo_res,
+                                 plot_name = "Random walk second order",xout = xout,
+                                 sim_output = sim_model_output, diags_dat = diags_df,
+                                 X_Design = stan_data_discrete$X_design_diag)
+prior_res_2.75<-plot_stan_model_fit(model_output = prior_2.75_combo_res,
+                                   plot_name = "Random walk second order",xout = xout,
+                                   sim_output = sim_model_output, diags_dat = diags_df,
+                                   X_Design = stan_data_discrete$X_design_diag)
+
+prior_res_3<-plot_stan_model_fit(model_output = prior_3_combo_res,
+                                 plot_name = "Random walk second order",xout = xout,
+                                 sim_output = sim_model_output, diags_dat = diags_df,
+                                 X_Design = stan_data_discrete$X_design_diag)
+
+
+prior_res_2$combed_plot
+prior_res_2.25$combed_plot
+prior_res_2.5$combed_plot
+prior_res_2.75$combed_plot
+prior_res_3$combed_plot
+
+
+###############################################################################
+## right lets run it with the poisson distribution instead ####################
+###############################################################################
+
+testing_priors_poisson <- function(stan_data, prior_start, prior_end,
+                           length_o_priors){
+  
+  run_ids_3 <- NULL
+  prior_vals <- seq(from = prior_start, to = prior_end,
+                    length.out = length_o_priors)
+  
+  for(k in 1:5){
+    j <- prior_vals[k]
+    delta_priors <- c(0,(j*2),0.1,j)
+    kappa_priors <- c(0, (j*2), 0, j)
+    
+    stan_data_discrete <- stan_data
+    stan_data_discrete$delta_priors <- delta_priors
+    stan_data_discrete$kappa_priors <- kappa_priors
+    stan_data_discrete$poisson_or_negbin <- 0
+    
+    name_run <- paste("Prior_combo_Poisson:",as.character(j))
+    
+    params_monitor_hiv<-c("y_hat","iota","fitted_output","beta","sigma_pen", "phi_pen", "delta_beta")
+    
+    cluster_run <- obj$enqueue(single_run_rw_delta(stan_data = stan_data_discrete,
+                                                   parameters_to_mon = params_monitor_hiv,
+                                                   warmup_length = 500,iter_length = 1500,
+                                                   adapt_delta = 0.95), name = name_run)
+    
+    print(cluster_run$status())
+    run_ids_3 <- c(run_ids_3, cluster_run$id)
+    
+    
+    
+  }
+  
+  return(run_ids_3)
+}
+
+run_1_5_outs <- testing_priors_poisson(stan_data_discrete, prior_start = 1,
+                               prior_end = 5, length_o_priors = 5)
+
+prior_poiss_1_combo <- obj$task_get(run_1_5_outs[1])
+prior_poiss_2_combo <- obj$task_get(run_1_5_outs[2])
+prior_poiss_3_combo <- obj$task_get(run_1_5_outs[3])
+prior_poiss_4_combo <- obj$task_get(run_1_5_outs[4])
+prior_poiss_5_combo <- obj$task_get(run_1_5_outs[5])
+
+prior_poiss_1_combo$status()
+prior_poiss_2_combo$status()
+prior_poiss_3_combo$status()
+prior_poiss_4_combo$status()
+prior_poiss_5_combo$status()
+
+prior_poiss_1_combo$log()
+prior_poiss_2_combo$log()
+prior_poiss_3_combo$log()
+prior_poiss_4_combo$log()
+prior_poiss_5_combo$log()
+
+prior_poiss_1_combo_res <- prior_poiss_1_combo$result()
+prior_poiss_2_combo_res <- prior_poiss_2_combo$result()
+prior_poiss_3_combo_res <- prior_poiss_3_combo$result()
+prior_poiss_4_combo_res <- prior_poiss_4_combo$result()
+prior_poiss_5_combo_res <- prior_poiss_5_combo$result()
+
+prior_poiss_res_1<-plot_stan_model_fit(model_output = prior_poiss_1_combo_res,
+                                 plot_name = "Random walk second order",xout = xout,
+                                 sim_output = sim_model_output, diags_dat = diags_df,
+                                 X_Design = stan_data_discrete$X_design_diag)
+
+prior_poiss_res_2<-plot_stan_model_fit(model_output = prior_poiss_2_combo_res,
+                                       plot_name = "Random walk second order",xout = xout,
+                                       sim_output = sim_model_output, diags_dat = diags_df,
+                                       X_Design = stan_data_discrete$X_design_diag)
+prior_poiss_res_3<-plot_stan_model_fit(model_output = prior_poiss_3_combo_res,
+                                       plot_name = "Random walk second order",xout = xout,
+                                       sim_output = sim_model_output, diags_dat = diags_df,
+                                       X_Design = stan_data_discrete$X_design_diag)
+prior_poiss_res_4<-plot_stan_model_fit(model_output = prior_poiss_4_combo_res,
+                                       plot_name = "Random walk second order",xout = xout,
+                                       sim_output = sim_model_output, diags_dat = diags_df,
+                                       X_Design = stan_data_discrete$X_design_diag)
+prior_poiss_res_5<-plot_stan_model_fit(model_output = prior_poiss_5_combo_res,
+                                       plot_name = "Random walk second order",xout = xout,
+                                       sim_output = sim_model_output, diags_dat = diags_df,
+                                       X_Design = stan_data_discrete$X_design_diag)
+
+
+prior_poiss_res_1$combed_plot
+prior_poiss_res_2$combed_plot
+prior_poiss_res_3$combed_plot
+prior_poiss_res_4$combed_plot
+prior_poiss_res_5$combed_plot
+
+###############################################################################
+## So the wide priors really aren't working for this, lets try them out #######
+## between 0.5 and 1.5 ########################################################
+###############################################################################
+
+run_0.5_1.5_outs <- testing_priors_poisson(stan_data_discrete, prior_start = 0.5,
+                                       prior_end = 1.5, length_o_priors = 5)
+
+prior_poiss_0.5_combo <- obj$task_get(run_0.5_1.5_outs[1])
+prior_poiss_0.75_combo <- obj$task_get(run_0.5_1.5_outs[2])
+prior_poiss_1_combo <- obj$task_get(run_0.5_1.5_outs[3])
+prior_poiss_1.25_combo <- obj$task_get(run_0.5_1.5_outs[4])
+prior_poiss_1.5_combo <- obj$task_get(run_0.5_1.5_outs[5])
+
+
+prior_poiss_0.5_combo$status()
+prior_poiss_0.75_combo$status()
+prior_poiss_1_combo$status()
+prior_poiss_1.25_combo$status()
+prior_poiss_1.5_combo$status()
+
+prior_poiss_0.5_combo$log()
+prior_poiss_0.75_combo$log()
+prior_poiss_1_combo$log()
+prior_poiss_1.25_combo$log()
+prior_poiss_1.5_combo$log()
+
+prior_poiss_0.5_combo_res <- prior_poiss_0.5_combo$result()
+prior_poiss_0.75_combo_res <- prior_poiss_0.75_combo$result()
+prior_poiss_1_combo_res <- prior_poiss_1_combo$result()
+prior_poiss_1.25_combo_res <- prior_poiss_1.25_combo$result()
+prior_poiss_1.5_combo_res <- prior_poiss_1.5_combo$result()
+
+prior_poiss_res_0.5<-plot_stan_model_fit(model_output = prior_poiss_0.5_combo_res,
+                                       plot_name = "Random walk second order",xout = xout,
+                                       sim_output = sim_model_output, diags_dat = diags_df,
+                                       X_Design = stan_data_discrete$X_design_diag)
+
+prior_poiss_res_0.75<-plot_stan_model_fit(model_output = prior_poiss_0.75_combo_res,
+                                       plot_name = "Random walk second order",xout = xout,
+                                       sim_output = sim_model_output, diags_dat = diags_df,
+                                       X_Design = stan_data_discrete$X_design_diag)
+prior_poiss_res_1<-plot_stan_model_fit(model_output = prior_poiss_1_combo_res,
+                                       plot_name = "Random walk second order",xout = xout,
+                                       sim_output = sim_model_output, diags_dat = diags_df,
+                                       X_Design = stan_data_discrete$X_design_diag)
+prior_poiss_res_1.25<-plot_stan_model_fit(model_output = prior_poiss_1.25_combo_res,
+                                       plot_name = "Random walk second order",xout = xout,
+                                       sim_output = sim_model_output, diags_dat = diags_df,
+                                       X_Design = stan_data_discrete$X_design_diag)
+prior_poiss_res_1.5<-plot_stan_model_fit(model_output = prior_poiss_1.5_combo_res,
+                                       plot_name = "Random walk second order",xout = xout,
+                                       sim_output = sim_model_output, diags_dat = diags_df,
+                                       X_Design = stan_data_discrete$X_design_diag)
+
+
+prior_poiss_res_0.5$combed_plot
+prior_poiss_res_0.75$combed_plot
+prior_poiss_res_1$combed_plot
+prior_poiss_res_1.25$combed_plot
+prior_poiss_res_1.5$combed_plot
+
+###############################################################################
+## None of those runs were any good, lets try one with some really wide #######
+## priors now #################################################################
+###############################################################################
+
+run_2_12_outs <- testing_priors_poisson(stan_data_discrete, prior_start = 2,
+                                           prior_end = 12, length_o_priors = 5)
+
+prior_poiss_2_combo <- obj$task_get(run_2_12_outs[1])
+prior_poiss_4.5_combo <- obj$task_get(run_2_12_outs[2])
+prior_poiss_7_combo <- obj$task_get(run_2_12_outs[3])
+prior_poiss_9.5_combo <- obj$task_get(run_2_12_outs[4])
+prior_poiss_12_combo <- obj$task_get(run_2_12_outs[5])
+
+
+prior_poiss_2_combo$status()
+prior_poiss_4.5_combo$status()
+prior_poiss_7_combo$status()
+prior_poiss_9.5_combo$status()
+prior_poiss_12_combo$status()
+
+prior_poiss_2_combo$log()
+prior_poiss_4.5_combo$log()
+prior_poiss_7_combo$log()
+prior_poiss_9.5_combo$log()
+prior_poiss_12_combo$log()
+
+prior_poiss_2_combo_res <- prior_poiss_2_combo$result()
+prior_poiss_4.5_combo_res <- prior_poiss_4.5_combo$result()
+prior_poiss_7_combo_res <- prior_poiss_7_combo$result()
+prior_poiss_9.5_combo_res <- prior_poiss_9.5_combo$result()
+prior_poiss_12_combo_res <- prior_poiss_12_combo$result()
+
+prior_poiss_res_2<-plot_stan_model_fit(model_output = prior_poiss_2_combo_res,
+                                         plot_name = "Random walk second order",xout = xout,
+                                         sim_output = sim_model_output, diags_dat = diags_df,
+                                         X_Design = stan_data_discrete$X_design_diag)
+
+prior_poiss_res_4.5<-plot_stan_model_fit(model_output = prior_poiss_4.5_combo_res,
+                                          plot_name = "Random walk second order",xout = xout,
+                                          sim_output = sim_model_output, diags_dat = diags_df,
+                                          X_Design = stan_data_discrete$X_design_diag)
+prior_poiss_res_7<-plot_stan_model_fit(model_output = prior_poiss_7_combo_res,
+                                       plot_name = "Random walk second order",xout = xout,
+                                       sim_output = sim_model_output, diags_dat = diags_df,
+                                       X_Design = stan_data_discrete$X_design_diag)
+prior_poiss_res_9.5<-plot_stan_model_fit(model_output = prior_poiss_9.5_combo_res,
+                                          plot_name = "Random walk second order",xout = xout,
+                                          sim_output = sim_model_output, diags_dat = diags_df,
+                                          X_Design = stan_data_discrete$X_design_diag)
+prior_poiss_res_12<-plot_stan_model_fit(model_output = prior_poiss_12_combo_res,
+                                         plot_name = "Random walk second order",xout = xout,
+                                         sim_output = sim_model_output, diags_dat = diags_df,
+                                         X_Design = stan_data_discrete$X_design_diag)
+
+
+prior_poiss_res_2$combed_plot
+prior_poiss_res_4.5$combed_plot
+prior_poiss_res_7$combed_plot
+prior_poiss_res_9.5$combed_plot
+prior_poiss_res_12$combed_plot
+
+
+
